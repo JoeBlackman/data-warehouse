@@ -1,3 +1,8 @@
+"""
+The create_tables.py module will be used to delete existing tables in a specified cluster,
+then create the staging and star schema tables used by our ETL logic.
+"""
+
 import configparser
 import psycopg2
 from sql_queries import create_table_queries, drop_table_queries
