@@ -2,21 +2,33 @@
 This module is intended to test the create_tables.py module.
 """
 
+import create_tables
 import configparser
 import psycopg2
 import pytest
+import os
+import sys
+import inspect
 
-import create_tables
+currentdir = os.path.dirname(
+    os.path.abspath(
+        inspect.getfile(
+            inspect.currentframe()
+        )
+    )
+)
+parentdir = os.path.dirname(currentdir)
+sys.path.insert(0, parentdir)
 
 
 # CONFIG
 config = configparser.ConfigParser()
 config.read('dwh.cfg')
-cluster = config['CLUSTER']
+cluster = config['REDSHIFT']
 
 
-#@pytest.fixture
-#def connection_handler():
+# @pytest.fixture
+# def connection_handler():
 #    conn = psycopg2.connect(
 #        f"host={cluster['HOST']} dbname={cluster['DB_NAME']} user={cluster['DB_USER']} password={cluster['DB_PASSWORD']}")
 #    cur = conn.cursor()
@@ -24,23 +36,27 @@ cluster = config['CLUSTER']
 #    conn.close()
 
 
-#@pytest.fixture
-#def setup():
+# @pytest.fixture
+# def setup():
 #    create_tables.drop_tables()
 #    create_tables.create_tables()
 
 
-#@pytest.fixture
-#def teardown():
+# @pytest.fixture
+# def teardown():
 #    create_tables.drop_tables()
 
 
-@pytest.fixture(scope="session")
-def setup_tables():
-    create_tables.drop_tables()
-    create_tables.create_tables()
+@pytest.fixture(scope="module")
+def setup_tables(connection_handler):
+    create_tables.drop_tables(conn=connection_handler,
+                              cur=connection_handler.cursor)
+    create_tables.create_tables(
+        conn=connection_handler, cur=connection_handler.cursor)
     yield
-    create_tables.drop_tables()
+    create_tables.drop_tables(conn=connection_handler,
+                              cur=connection_handler.cursor)
+
 
 def test_staging_events_table(connection_handler, setup_tables):
     # assert that the table exists
