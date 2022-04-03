@@ -8,6 +8,8 @@ import configparser
 import psycopg2
 from sql_queries import create_table_queries, drop_table_queries
 
+import config
+
 
 def drop_tables(cur, conn):
     for query in drop_table_queries:
@@ -22,29 +24,17 @@ def create_tables(cur, conn):
 
 
 def main():
-    config = configparser.ConfigParser()
-    config.read('dwh.cfg')
-
-    REGION = config.get('AWS', 'REGION')
-    KEY = config.get('AWS', 'KEY')
-    SECRET = config.get('AWS', 'SECRET')
-    CLUSTER_ID = config.get('REDSHIFT', 'DWH_CLUSTER_IDENTIFIER')
-    DB_NAME = config.get('REDSHIFT', 'DWH_DB')
-    USER = config.get('REDSHIFT', 'DWH_DB_USER')
-    PW = config.get('REDSHIFT', 'DWH_DB_PASSWORD')
-    PORT = config.get('REDSHIFT', 'DWH_PORT')
-
     redshift_client = boto3.client(
         'redshift',
-        region_name=REGION,
-        aws_access_key_id=KEY,
-        aws_secret_access_key=SECRET
+        region_name=config.REGION,
+        aws_access_key_id=config.KEY,
+        aws_secret_access_key=config.SECRET
     )
-    HOST = redshift_client.describe_clusters(ClusterIdentifier=CLUSTER_ID)[
+    HOST = redshift_client.describe_clusters(ClusterIdentifier=config.CLUSTER_ID)[
         'Clusters'][0]['Endpoint']['Address']
 
     conn = psycopg2.connect(
-        f"host={HOST} dbname={DB_NAME} user={USER} password={PW} port={PORT}")
+        f"host={HOST} dbname={config.DB_NAME} user={config.USER} password={config.PW} port={config.PORT}")
     cur = conn.cursor()
 
     drop_tables(cur, conn)

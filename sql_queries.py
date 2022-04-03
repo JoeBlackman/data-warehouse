@@ -52,7 +52,6 @@ staging_songs_table_create = ("""
         title               TEXT,
         duration            DECIMAL,
         year                INTEGER
-        
     )
 """)
 
@@ -151,24 +150,136 @@ staging_songs_copy = (f"""
     REGION '{config['AWS']['REGION']}';
 """)
 
-# FINAL TABLES
+# ANALYSIS TABLES
 
-songplay_table_insert = ("""
-    INSERT INTO songplay ()
-    VALUES ();
+songplay_table_insert = (f"""
+    INSERT INTO songplays 
+        (
+            time_id, 
+            user_id, 
+            level, 
+            song_id, 
+            artist_id, 
+            session_id, 
+            location, 
+            user_agent
+        )
+    VALUES 
+        (
+            $time_id, 
+            $user_id, 
+            $level, 
+            $song_id,
+            $artist_id, 
+            $session_id, 
+            $location, 
+            $user_agent
+        );
+    ON CONFLICT UPDATE
 """)
 
-user_table_insert = ("""
-""")
+user_table_insert = f"""
+    INSERT INTO users
+        (
+            user_id,
+            first_name,
+            last_name,
+            gender,
+            level
+        )
+    VALUES 
+        (
+            $user_id, 
+            $first_name, 
+            $last_name, 
+            $gender, 
+            $level
+        )
+    ON CONFLICT DO NOTHING;
+"""
 
-song_table_insert = ("""
-""")
+song_table_insert = f"""
+    INSERT INTO songs 
+        (
+            song_id, 
+            title, 
+            artist_id, 
+            year, 
+            duration
+        )
+    VALUES 
+        (
+            $song_id, 
+            $title, 
+            $artist_id, 
+            $year, 
+            $duration
+        )
+    ON CONFLICT DO NOTHING;
+"""
 
-artist_table_insert = ("""
-""")
+artist_table_insert = f"""
+    INSERT INTO artists
+        (
+            artist_id,
+            name,
+            location,
+            latitude,
+            longitude
+        )
+    VALUES
+        (
+            $artist_id, 
+            $name, 
+            $location, 
+            $latitude, 
+            $longitude
+        )
+    ON CONFLICT DO NOTHING;
+"""
 
-time_table_insert = ("""
-""")
+time_table_insert = f"""
+    INSERT INTO time
+        (
+            start_time,
+            hour,
+            day,
+            week,
+            month,
+            year,
+            weekday
+        )
+    VALUES
+        (
+            $start_time, 
+            $hour, 
+            $day, 
+            $week,
+            $month,
+            $year,
+            $weekday
+        )
+    ON CONFLICT DO NOTHING;
+"""
+
+get_last_time_id = f"""
+    SELECT time_id
+    FROM time
+    ORDER BY time_id
+    LIMIT 1;
+"""
+
+get_artist_id = f"""
+    SELECT artist_id
+    FROM artists
+    WHERE name=$name;
+"""
+
+get_song_id = f"""
+    SELECT song_id
+    FROM songs
+    WHERE title=$title AND artist_id=$artist_id;
+"""
 
 # QUERY LISTS
 
