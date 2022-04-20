@@ -33,16 +33,9 @@ def insert_tables():
     """
     This method will load data into the analysis tables from the staging tables.
     """
-    # url = URL.create(
-    #    drivername='redshift+redshift_connector',
-    #    host='<>..<aws-region>.redshift.amazonaws.com',
-    #    port=5439,
-    #    database='',
-    #    username='',
-    #    password=''
-    # )
+
     engine = sa.create_engine(
-        f'postgresql://{config.USER}:{config.PW}@{config.DWH_ENDPOINT}:{config.PORT}/{config.DB_NAME}')
+        f'postgresql://{config.USER}:{config.PW}@{config.ENDPOINT}:{config.PORT}/{config.DB_NAME}')
 
     # get rows from staging_songs table
     staging_songs_df = pd.read_sql_query(
@@ -53,9 +46,10 @@ def insert_tables():
         'artist_location', 'artist_name', 'song_id', 'title', 'duration', 'year'
     ]
     # load data from staging_songs table into analysis tables for songs and artists
-    for row in staging_songs_df:
-        insert_songs = Template(sql_queries.song_table_insert)
-        insert_songs.substitute(
+    print('Loading songs and artists tables from staging_songs table...')
+    for index, row in staging_songs_df.iterrows():
+        insert_songs_t = Template(sql_queries.song_table_insert)
+        insert_songs = insert_songs_t.substitute(
             song_id=row['song_id'],
             title=row['title'],
             artist_id=row['artist_id'],
@@ -63,9 +57,13 @@ def insert_tables():
             duration=row['duration']
         )
         with engine.connect() as connection:
-            connection.execute(insert_songs)
-        insert_artists = Template(sql_queries.artist_table_insert)
-        insert_artists.substitute(
+            try:
+                connection.execute(sa.text(insert_songs))
+            except Exception as e:
+                print(f'Error on query: {insert_songs}')
+                print(e)
+        insert_artists_t = Template(sql_queries.artist_table_insert)
+        insert_artists = insert_artists_t.substitute(
             artist_id=row['artist_id'],
             name=row['artist_name'],
             location=row['artist_location'],
@@ -73,7 +71,13 @@ def insert_tables():
             longitude=row['artist_longitude']
         )
         with engine.connect() as connection:
-            connection.execute(insert_artists)
+            try:
+                connection.execute(sa.text(insert_artists))
+            except Exception as e:
+                print(f'Error on query: {insert_artists}')
+                print(e)
+    print('Completed loading songs and artists tables!')
+
     staging_events_df = pd.read_sql_query(
         'SELECT * FROM staging_events;', con=engine)
     # set headers of staging_events_df
@@ -83,51 +87,57 @@ def insert_tables():
         'sessionId', 'song', 'status', 'ts', 'userAgent', 'userId'
     ]
     # load data from staging_events table into analysis tables for users, time, and songplays
-    for row in staging_events_df:
-        insert_users = Template(sql_queries.user_table_insert)
-        insert_users.substitute(
-            user_id=row['userId'],
+    print('Loading users, time, and songplays tables from staging_events table...')
+    for index, row in staging_events_df.iterrows():
+        insert_users_t = Template(sql_queries.user_table_insert)
+        insert_users = insert_users_t.substitute(
+            user_id=int(row['userId']),
             first_name=row['firstName'],
             last_name=row['lastName'],
             gender=row['gender'],
             level=row['level']
         )
         with engine.connect() as connection:
-            connection.execute(insert_users)
-        insert_time = Template(sql_queries.time_table_insert)
+            try:
+                connection.execute(sa.text(insert_users))
+            except Exception as e:
+                print(f'Error on query: {insert_users}')
+                print(e)
+        insert_time_t = Template(sql_queries.time_table_insert)
         # transform ts into new fields for time table
         t = pd.to_datetime(row['ts'], unit='ms')
-        insert_time.substitute(
+        insert_time = insert_time_t.substitute(
             start_time=t,
-            hour=t.dt.hour,
-            day=t.dt.day,
-            week=t.dt.week,
-            month=t.dt.month,
-            year=t.dt.year,
-            weekday=t.dt.weekday
+            hour=t.hour,
+            day=t.day,
+            week=t.week,
+            month=t.month,
+            year=t.year,
+            weekday=t.day_of_week
         )
         with engine.connect() as connection:
-            connection.execute(insert_time)
-        insert_songplays = Template(sql_queries.songplay_table_insert)
+            connection.execute(sa.text(insert_time))
+        insert_songplays_t = Template(sql_queries.songplay_table_insert)
         # get the time_id of the last inserted time
         with engine.connect() as connection:
-            result = connection.execute(sql_queries.get_last_time_id)
+            result = connection.execute(sa.text(sql_queries.get_last_time_id))
             r = result.fetchone()
             time_id = row[0]
             #time_id = row._mapping[time.c.time_id]
         # get the song_id from songs table with matching song and artist name
         with engine.connect() as connection:
             result = connection.execute(
-                Template(sql_queries.get_artist_id).substitute(name=row['artist']))
+                sa.text(Template(sql_queries.get_artist_id).substitute(name=row['artist'])))
             r = result.fetchone()
             artist_id = row[0]
         # get the artist_id from the artist table with matching artist name and location
         with engine.connect() as connection:
+            # should title be song?
             result = connection.execute(
-                Template(sql_queries.get_song_id).substitute(title=row['title'], artist_id=artist_id))
+                sa.text(Template(sql_queries.get_song_id).substitute(title=row['song'], artist_id=artist_id)))
             r = result.fetchone()
             song_id = row[0]
-        insert_songplays.substitute(
+        insert_songplays = insert_songplays_t.substitute(
             time_id=time_id,
             user_id=row['userId'],
             level=row['level'],
@@ -135,8 +145,21 @@ def insert_tables():
             artist_id=artist_id,
             session_id=row['sessionId'],
             location=row['location'],
-            user_agent=row['sessionId'],
+            user_agent=row['userAgent'],
         )
+        with engine.connect() as connection:
+            try:
+                connection.execute(sa.text(insert_songplays))
+            except Exception as e:
+                print(f'Error on query: {insert_songplays}')
+                print(e)
+    print('Completed loading users, time, and songplays tables!')
+    print('Cleaning up duplicates in users, artists, and songs tables...')
+    with engine.connect() as connection:
+        connection.execute(sa.text(sql_queries.clean_up_duplicate_users))
+        connection.execute(sa.text(sql_queries.clean_up_duplicate_artists))
+        connection.execute(sa.text(sql_queries.clean_up_duplicate_songs))
+    print('Completed cleaning up duplicates in users, time, and songs tables!')
     # for query in insert_table_queries:
     #    cur.execute(query)
     #    conn.commit()

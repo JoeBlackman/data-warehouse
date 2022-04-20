@@ -4,22 +4,23 @@ The purpose of this project is to leverage AWS and data warehouse concepts to bu
 
 # **INSTRUCTIONS**
 
-- [console, possibly create_cluster.py] create a redshift cluster on AWS via the redshift console
-- [dwh_interface.ipynb] verify that the cluster is available, needs to be easily callable
+- [dwh_interface.ipynb] create a redshift cluster on AWS by running the appropriate cells in dwh_interface.ipynb
+- [dwh_interface.ipynb] verify that the cluster is available by running the appropriate cells in dwh_interface.ipynb
 - [dwh_interface.ipynb] ensure redshift is permitted to copy from s3 to its database
-- [create_tables.py, sql_queries.py] create tables in redshift cluster
-- [etl.py, sql_queries.py] copy contents of s3 bucket to staging tables in redshift
-- [code] verify that the tables have been filled properly
-
-- [code] insert data from staging tables to production tables
-- [code] verify that tables have been filled properly
-- [code] run queries by analytics team to validate etl pipeline construction
-- [console] delete the cluster (avoid extra charges)
+- [create_tables.py, sql_queries.py] create tables in redshift cluster by running create_tables.py
+- [etl.py, sql_queries.py] copy contents of s3 bucket to staging tables in redshift and insert that data into analysis tables by running etl.py
+- [dwh_interface.ipynb] verify that tables have been filled properly by running queries from dwh_interface.ipynb
+- [dwh_interface.ipynb] delete the cluster (avoid extra charges) by running the appropriate cells in dwh_interface.ipynb
 
 # **MANIFEST**
 
-- create cluster [might delete this]
+- analysis_star_schema.odg
+- analysis_star_schema.dpf
+- config.py
 - create_table.py
+- dwh.cfg
+- dwh_interface.ipynb
 - etl.py
 - README.md
 - sql_queries.py
+- TODO.md

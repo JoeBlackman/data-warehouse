@@ -151,8 +151,14 @@ staging_songs_copy = (f"""
 """)
 
 # ANALYSIS TABLES
+# NOTE: when these templated strings are passed into string.template and
+# the substitute function is called on them,
+# '$$' is considered an escape and is replaced with '$',
+# '$identifier' will be replaced by args from the substitute function
+# this is necessary to create templated strings that hold
+# double dollar quotes in postgres sql query
 
-songplay_table_insert = (f"""
+songplay_table_insert = f"""
     INSERT INTO songplays 
         (
             time_id, 
@@ -166,17 +172,16 @@ songplay_table_insert = (f"""
         )
     VALUES 
         (
-            $time_id, 
-            $user_id, 
-            $level, 
-            $song_id,
-            $artist_id, 
-            $session_id, 
-            $location, 
-            $user_agent
+            $$time_id$$$time_id$$time_id$$, 
+            $$user_id$$$user_id$$user_id$$, 
+            $$level$$$level$$level$$, 
+            $$song_id$$$song_id$$song_id$$,
+            $$artist_id$$$artist_id$$artist_id$$, 
+            $$session_id$$$session_id$$session_id$$, 
+            $$location$$$location$$location$$, 
+            $$user_agent$$$user_agent$$user_agent$$
         );
-    ON CONFLICT UPDATE
-""")
+"""
 
 user_table_insert = f"""
     INSERT INTO users
@@ -189,13 +194,12 @@ user_table_insert = f"""
         )
     VALUES 
         (
-            $user_id, 
-            $first_name, 
-            $last_name, 
-            $gender, 
-            $level
-        )
-    ON CONFLICT DO NOTHING;
+            $$user_id$$$user_id$$user_id$$, 
+            $$first_name$$$first_name$$first_name$$, 
+            $$last_name$$$last_name$$last_name$$, 
+            $$gender$$$gender$$gender$$, 
+            $$level$$$level$$level$$
+        );
 """
 
 song_table_insert = f"""
@@ -209,13 +213,12 @@ song_table_insert = f"""
         )
     VALUES 
         (
-            $song_id, 
-            $title, 
-            $artist_id, 
-            $year, 
-            $duration
-        )
-    ON CONFLICT DO NOTHING;
+            $$song_id$$$song_id$$song_id$$, 
+            $$title$$$title$$title$$, 
+            $$artist_id$$$artist_id$$artist_id$$, 
+            $$year$$$year$$year$$, 
+            $$duration$$$duration$$duration$$
+        );
 """
 
 artist_table_insert = f"""
@@ -229,13 +232,12 @@ artist_table_insert = f"""
         )
     VALUES
         (
-            $artist_id, 
-            $name, 
-            $location, 
-            $latitude, 
-            $longitude
-        )
-    ON CONFLICT DO NOTHING;
+            $$artist_id$$$artist_id$$artist_id$$, 
+            $$name$$$name$$name$$, 
+            $$location$$$location$$location$$, 
+            $$latitude$$$latitude$$latitude$$, 
+            $$longitude$$$longitude$$longitude$$
+        );
 """
 
 time_table_insert = f"""
@@ -251,15 +253,108 @@ time_table_insert = f"""
         )
     VALUES
         (
-            $start_time, 
-            $hour, 
-            $day, 
-            $week,
-            $month,
-            $year,
-            $weekday
-        )
-    ON CONFLICT DO NOTHING;
+            $$start_time$$$start_time$$start_time$$, 
+            $$hour$$$hour$$hour$$, 
+            $$day$$$day$$day$$, 
+            $$week$$$week$$week$$,
+            $$month$$$month$$month$$,
+            $$year$$$year$$year$$,
+            $$weekday$$$weekday$$weekday$$
+        );
+"""
+
+# source: https://elliotchance.medium.com/removing-duplicate-data-in-redshift-45a43b7ae334
+clean_up_duplicate_songs = """
+BEGIN
+-- Identify duplicates
+CREATE TEMP TABLE dup_songs AS
+SELECT song_id
+FROM songs
+GROUP BY song_id
+HAVING COUNT(*) >1;
+
+-- Extract one copy of each duplicate
+CREATE TEMP TABLE new_songs(LIKE songs);
+INSERT INTO new_songs
+SELECT DISTINCT *
+FROM songs
+WHERE song_id IN (SELECT song_id FROM dup_songs);
+
+-- Remove all rows that were duplicated (all copies)
+DELETE FROM songs
+WHERE song_id IN (SELECT song_id FROM dup_songs);
+
+-- Insert the rest of the records that had no duplicates
+INSERT INTO songs
+SELECT *
+FROM new_songs;
+
+-- clean up
+DROP TABLE dup_songs;
+DROP TABLE new_songs;
+COMMIT;
+"""
+
+clean_up_duplicate_artists = """
+BEGIN
+-- Identify duplicates
+CREATE TEMP TABLE dup_artists AS
+SELECT artist_id
+FROM artists
+GROUP BY artist_id
+HAVING COUNT(*) >1;
+
+-- Extract one copy of each duplicate
+CREATE TEMP TABLE new_artists(LIKE artists);
+INSERT INTO new_artists
+SELECT DISTINCT *
+FROM artists
+WHERE artist_id IN (SELECT artist_id FROM dup_artists);
+
+-- Remove all rows that were duplicated (all copies)
+DELETE FROM artists
+WHERE artist_id IN (SELECT artist_id FROM dup_artists);
+
+-- Insert the rest of the records that had no duplicates
+INSERT INTO artists
+SELECT *
+FROM new_artists;
+
+-- clean up
+DROP TABLE dup_artists;
+DROP TABLE new_artists;
+COMMIT;
+"""
+
+clean_up_duplicate_users = """
+BEGIN
+-- Identify duplicates
+CREATE TEMP TABLE dup_users AS
+SELECT user_id
+FROM users
+GROUP BY user_id
+HAVING COUNT(*) >1;
+
+-- Extract one copy of each duplicate
+CREATE TEMP TABLE new_users(LIKE users);
+INSERT INTO new_users
+SELECT DISTINCT *
+FROM users
+WHERE user_id IN (SELECT user_id FROM dup_users);
+
+-- Remove all rows that were duplicated (all copies)
+DELETE FROM users
+WHERE user_id IN (SELECT user_id FROM dup_users);
+
+-- Insert the rest of the records that had no duplicates
+INSERT INTO users
+SELECT *
+FROM new_users;
+
+-- clean up
+DROP TABLE dup_users;
+DROP TABLE new_users;
+COMMIT;
 """
 
 get_last_time_id = f"""
@@ -272,13 +367,13 @@ get_last_time_id = f"""
 get_artist_id = f"""
     SELECT artist_id
     FROM artists
-    WHERE name=$name;
+    WHERE name=$$n$$$name$$n$$;
 """
 
 get_song_id = f"""
     SELECT song_id
     FROM songs
-    WHERE title=$title AND artist_id=$artist_id;
+    WHERE title=$$t$$$title$$t$$ AND artist_id=$$a$$$artist_id$$a$$;
 """
 
 # QUERY LISTS
