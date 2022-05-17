@@ -40,3 +40,5 @@ sql_queries.py responsible for housing SQL queries for creation, insertion, sele
   -- added casting for user_id when building query string, in the process of testing it
 - [FIXED] pandas date time has no object attribute dt, something isn't right with how i'm creating the date time components
   -- was not calling methods of datetime object correctly, also changed weekday to day of week
+- last run of etl ended with my cluster disappearing. why?!
+- taking forever to run code and test it. need more testable code to speed up dev process

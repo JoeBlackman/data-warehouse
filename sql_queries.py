@@ -25,7 +25,7 @@ staging_events_table_create = ("""
         gender              CHAR,
         itemInSession       INTEGER,
         lastName            TEXT,
-        lenth               DECIMAL,
+        lenth               DECIMAL(9, 5),
         level               TEXT,
         location            TEXT,
         method              TEXT,
@@ -44,13 +44,13 @@ staging_songs_table_create = ("""
     CREATE TABLE IF NOT EXISTS staging_songs (
         num_songs           INTEGER,
         artist_id           TEXT,
-        artist_latitude     DECIMAL,
-        artist_longitude    DECIMAL,
+        artist_latitude     DECIMAL(5, 2),
+        artist_longitude    DECIMAL(5, 2),
         artist_location     TEXT,
         artist_name         TEXT,
         song_id             TEXT,
         title               TEXT,
-        duration            DECIMAL,
+        duration            DECIMAL(9, 5),
         year                INTEGER
     )
 """)
@@ -93,7 +93,7 @@ song_table_create = ("""
         title       TEXT                NOT NULL,
         artist_id   TEXT                NOT NULL,
         year        INTEGER,
-        duration    DECIMAL             NOT NULL,
+        duration    DECIMAL(9, 5)       NOT NULL,
         primary key(song_id)
     )
     distkey(song_id)
@@ -105,8 +105,8 @@ artist_table_create = ("""
         artist_id   TEXT                NOT NULL,
         name        TEXT                NOT NULL,
         location    TEXT,
-        latitude    DECIMAL,
-        longitude   DECIMAL,
+        latitude    DECIMAL(5, 2),
+        longitude   DECIMAL(5, 2),
         primary key(artist_id)
     )
     distkey(artist_id)
@@ -158,6 +158,31 @@ staging_songs_copy = (f"""
 # this is necessary to create templated strings that hold
 # double dollar quotes in postgres sql query
 
+# songplay_table_insert = f"""
+#     INSERT INTO songplays
+#         (
+#             time_id,
+#             user_id,
+#             level,
+#             song_id,
+#             artist_id,
+#             session_id,
+#             location,
+#             user_agent
+#         )
+#     VALUES
+#         (
+#             $$time_id$$$time_id$$time_id$$,
+#             $$user_id$$$user_id$$user_id$$,
+#             $$level$$$level$$level$$,
+#             $$song_id$$$song_id$$song_id$$,
+#             $$artist_id$$$artist_id$$artist_id$$,
+#             $$session_id$$$session_id$$session_id$$,
+#             $$location$$$location$$location$$,
+#             $$user_agent$$$user_agent$$user_agent$$
+#         );
+# """
+
 songplay_table_insert = f"""
     INSERT INTO songplays 
         (
@@ -172,16 +197,35 @@ songplay_table_insert = f"""
         )
     VALUES 
         (
-            $$time_id$$$time_id$$time_id$$, 
-            $$user_id$$$user_id$$user_id$$, 
-            $$level$$$level$$level$$, 
-            $$song_id$$$song_id$$song_id$$,
-            $$artist_id$$$artist_id$$artist_id$$, 
-            $$session_id$$$session_id$$session_id$$, 
-            $$location$$$location$$location$$, 
-            $$user_agent$$$user_agent$$user_agent$$
+            $time_id, 
+            $user_id, 
+            $level, 
+            $song_id,
+            $artist_id, 
+            $session_id, 
+            $location, 
+            $user_agent
         );
 """
+
+# user_table_insert = f"""
+#     INSERT INTO users
+#         (
+#             user_id,
+#             first_name,
+#             last_name,
+#             gender,
+#             level
+#         )
+#     VALUES
+#         (
+#             $$user_id$$$user_id$$user_id$$,
+#             $$first_name$$$first_name$$first_name$$,
+#             $$last_name$$$last_name$$last_name$$,
+#             $$gender$$$gender$$gender$$,
+#             $$level$$$level$$level$$
+#         );
+# """
 
 user_table_insert = f"""
     INSERT INTO users
@@ -194,13 +238,32 @@ user_table_insert = f"""
         )
     VALUES 
         (
-            $$user_id$$$user_id$$user_id$$, 
-            $$first_name$$$first_name$$first_name$$, 
-            $$last_name$$$last_name$$last_name$$, 
-            $$gender$$$gender$$gender$$, 
-            $$level$$$level$$level$$
+            $user_id, 
+            $first_name, 
+            $last_name, 
+            $gender, 
+            $level
         );
 """
+
+# song_table_insert = f"""
+#     INSERT INTO songs
+#         (
+#             song_id,
+#             title,
+#             artist_id,
+#             year,
+#             duration
+#         )
+#     VALUES
+#         (
+#             $$song_id$$$song_id$$song_id$$,
+#             $$title$$$title$$title$$,
+#             $$artist_id$$$artist_id$$artist_id$$,
+#             $$year$$$year$$year$$,
+#             $$duration$$$duration$$duration$$
+#         );
+# """
 
 song_table_insert = f"""
     INSERT INTO songs 
@@ -213,13 +276,32 @@ song_table_insert = f"""
         )
     VALUES 
         (
-            $$song_id$$$song_id$$song_id$$, 
-            $$title$$$title$$title$$, 
-            $$artist_id$$$artist_id$$artist_id$$, 
-            $$year$$$year$$year$$, 
-            $$duration$$$duration$$duration$$
+            $song_id, 
+            $title, 
+            $artist_id, 
+            $year, 
+            $duration
         );
 """
+
+# artist_table_insert = f"""
+#     INSERT INTO artists
+#         (
+#             artist_id,
+#             name,
+#             location,
+#             latitude,
+#             longitude
+#         )
+#     VALUES
+#         (
+#             $$artist_id$$$artist_id$$artist_id$$,
+#             $$name$$$name$$name$$,
+#             $$location$$$location$$location$$,
+#             $$latitude$$$latitude$$latitude$$,
+#             $$longitude$$$longitude$$longitude$$
+#         );
+# """
 
 artist_table_insert = f"""
     INSERT INTO artists
@@ -232,13 +314,37 @@ artist_table_insert = f"""
         )
     VALUES
         (
-            $$artist_id$$$artist_id$$artist_id$$, 
-            $$name$$$name$$name$$, 
-            $$location$$$location$$location$$, 
-            $$latitude$$$latitude$$latitude$$, 
-            $$longitude$$$longitude$$longitude$$
+            $artist_id, 
+            $name, 
+            $location, 
+            $latitude, 
+            $longitude
         );
 """
+
+
+# time_table_insert = f"""
+#     INSERT INTO time
+#         (
+#             start_time,
+#             hour,
+#             day,
+#             week,
+#             month,
+#             year,
+#             weekday
+#         )
+#     VALUES
+#         (
+#             $$start_time$$$start_time$$start_time$$,
+#             $$hour$$$hour$$hour$$,
+#             $$day$$$day$$day$$,
+#             $$week$$$week$$week$$,
+#             $$month$$$month$$month$$,
+#             $$year$$$year$$year$$,
+#             $$weekday$$$weekday$$weekday$$
+#         );
+# """
 
 time_table_insert = f"""
     INSERT INTO time
@@ -253,13 +359,13 @@ time_table_insert = f"""
         )
     VALUES
         (
-            $$start_time$$$start_time$$start_time$$, 
-            $$hour$$$hour$$hour$$, 
-            $$day$$$day$$day$$, 
-            $$week$$$week$$week$$,
-            $$month$$$month$$month$$,
-            $$year$$$year$$year$$,
-            $$weekday$$$weekday$$weekday$$
+            $start_time, 
+            $hour, 
+            $day, 
+            $week,
+            $month,
+            $year,
+            $weekday
         );
 """
 
@@ -367,13 +473,13 @@ get_last_time_id = f"""
 get_artist_id = f"""
     SELECT artist_id
     FROM artists
-    WHERE name=$$n$$$name$$n$$;
+    WHERE name=$name;
 """
 
 get_song_id = f"""
     SELECT song_id
     FROM songs
-    WHERE title=$$t$$$title$$t$$ AND artist_id=$$a$$$artist_id$$a$$;
+    WHERE title=$title AND artist_id=$artist_id;
 """
 
 # QUERY LISTS
