@@ -33,7 +33,7 @@ logging.basicConfig(
 )
 
 
-def load_staging_tables(cur, conn):
+def load_staging_tables(conn):
     """
     This method will load data into the staging tables from the s3 bucket
     """
@@ -41,21 +41,23 @@ def load_staging_tables(cur, conn):
         'Copying data from s3 to staging_events and staging_songs tables')
     for query in copy_table_queries:
         try:
-            cur.execute(query)
+            with conn.cursor() as cur:
+                cur.execute(query)
         except Exception as e:
             logging.error(
                 f'Exception {e} occurred on execution of query: {query}')
             sys.exit(1)
 
 
-def insert_tables(cur):
+def insert_tables(conn):
     """
     This method collects all items from staging_songs and staging events and decides 
     what should be stored in analytical tables and how it should be stored
     """
     # get rows from staging_songs table then load the result into a pandas dataframe
-    cur.execute('SELECT * FROM staging_songs;')
-    staging_songs_data = cur.fetchall()
+    with conn.cursor() as cur:
+        cur.execute('SELECT * FROM staging_songs;')
+        staging_songs_data = cur.fetchall()
     staging_songs_df = pd.DataFrame(
         staging_songs_data,
         columns=[
@@ -68,13 +70,14 @@ def insert_tables(cur):
     logging.info('Loading songs and artists tables')
     for index, row in staging_songs_df.iterrows():
         data = formatForRedshift(row)
-        load_song(cur, data)
-        load_artist(cur, data)
+        load_song(conn, data)
+        load_artist(conn, data)
     logging.info('Completed loading songs and artists tables')
 
     # get rows from staging_events table then load the result into a pandas dataframe
-    cur.execute('SELECT * FROM staging_events;')
-    staging_events_data = cur.fetchall()
+    with conn.cursor() as cur:
+        cur.execute('SELECT * FROM staging_events;')
+        staging_events_data = cur.fetchall()
     staging_events_df = pd.DataFrame(
         staging_events_data,
         columns=[
@@ -96,16 +99,16 @@ def insert_tables(cur):
             if type(row['userId']) == str:
                 row['userId'] = int(float(row['userId']))
             data = formatForRedshift(row)
-            load_user(cur, data)
-            load_time(cur, data)
-            load_songplay(cur, data)
+            load_user(conn, data)
+            load_time(conn, data)
+            load_songplay(conn, data)
     logging.info('Completed loading users, time, and songplays tables!')
 
     # after tables have all been loaded, delete duplicate entries
-    cleanup_duplicates(cur)
+    cleanup_duplicates(conn)
 
 
-def load_song(cur, data):
+def load_song(conn, data):
     """
     Build query string for insertion into song table
     Insert song data into song table
@@ -119,14 +122,15 @@ def load_song(cur, data):
         duration=data['duration']
     )
     try:
-        cur.execute(insert_songs)
+        with conn.cursor() as cur:
+            cur.execute(insert_songs)
     except Exception as e:
         logging.error(
             f'Exception {e} occurred on execution of query: {insert_songs}')
         sys.exit(1)
 
 
-def load_artist(cur, data):
+def load_artist(conn, data):
     """
     Build query string for insertion into artist table
     Insert artist data into artist table
@@ -140,14 +144,15 @@ def load_artist(cur, data):
         longitude=data['artist_longitude']
     )
     try:
-        cur.execute(insert_artists)
+        with conn.cursor() as cur:
+            cur.execute(insert_artists)
     except Exception as e:
         logging.error(
             f'Exception {e} occurred on execution of query: {insert_artists}')
         sys.exit(1)
 
 
-def load_user(cur, data):
+def load_user(conn, data):
     """
     Build query string for insertion into user table
     Insert user data into user table
@@ -161,7 +166,8 @@ def load_user(cur, data):
         level=data['level']
     )
     try:
-        cur.execute(insert_users)
+        with conn.cursor() as cur:
+            cur.execute(insert_users)
     except NotNullViolation as nn:
         logging.error(
             f"""NotNullViolation {nn} occurred on execution of query: {insert_users}
@@ -172,7 +178,7 @@ def load_user(cur, data):
         sys.exit(1)
 
 
-def load_time(cur, data):
+def load_time(conn, data):
     """
     Transform timestamp from dataframe into new fields
     Build query string for insertion into time table
@@ -191,7 +197,7 @@ def load_time(cur, data):
         weekday=t.day_of_week
     )
     try:
-        with cur:
+        with conn.cursor() as cur:
             cur.execute(insert_time)
     except psycopg2.errors.SyntaxError as e:
         logging.error(f'Syntax Error on execution: {insert_time}')
@@ -202,15 +208,26 @@ def load_time(cur, data):
         sys.exit(1)
 
 
-def load_songplay(cur, data):
+def load_songplay(conn, data):
     # get the time_id of the last inserted time
-    time_id = cur.execute(sql_queries.get_last_time_id).fetchone()[0]
-    # get the song_id from songs table with matching song and artist name
-    artist_id = cur.execute(Template(sql_queries.get_artist_id).substitute(
-        name=data['artist'])).fetchone()[0]
-    # get the artist_id from the artist table with matching artist name and location
-    song_id = cur.execute(Template(sql_queries.get_song_id).substitute(
-        title=data['song'], artist_id=artist_id)).fetchone()[0]
+    with conn.cursor() as cur:
+        cur.execute(sql_queries.get_last_time_id)
+        t = cur.fetchone()
+        time_id = t[0] if t is not None else 'Null'
+        # get the song_id from songs table with matching song and artist name
+        cur.execute(Template(sql_queries.get_artist_id).substitute(
+            name=data['artist']))
+        a = cur.fetchone()
+        artist_id = a[0] if a is not None else 'Null'
+        # get the artist_id from the artist table with matching artist name and location
+        cur.execute(Template(sql_queries.get_song_id).substitute(
+            title=data['song'], artist_id=artist_id))
+        s = cur.fetchone()
+        song_id = s[0] if s is not None else 'Null'
+    if (time_id == 'Null') or (artist_id == 'Null') or (song_id == 'Null'):
+        # need to be able to relate to have a meaningful event, don't try to insert
+        # if info is incomplete
+        return
     insert_songplays_t = Template(sql_queries.songplay_table_insert)
     insert_songplays = insert_songplays_t.substitute(
         time_id=time_id,
@@ -223,34 +240,35 @@ def load_songplay(cur, data):
         user_agent=data['userAgent'],
     )
     try:
-        cur.execute(insert_songplays)
+        with conn.cursor() as cur:
+            cur.execute(insert_songplays)
     except Exception as e:
         logging.error(
             f'Exception {e} occurred on execution of query: {insert_songplays}')
         sys.exit(1)
 
 
-def cleanup_duplicates(cur):
+def cleanup_duplicates(conn):
     logging.info(
         'Cleaning up duplicates in users, artists, and songs tables...')
     try:
-        cur.execute(sql_queries.clean_up_duplicate_users)
+        with conn.cursor() as cur:
+            cur.execute(sql_queries.clean_up_duplicate_users)
     except Exception as e:
         logging.error(
             f'Exception {e} occurred on execution of query: {sql_queries.clean_up_duplicate_users}')
-        sys.exit(1)
     try:
-        cur.execute(sql_queries.clean_up_duplicate_artists)
+        with conn.cursor() as cur:
+            cur.execute(sql_queries.clean_up_duplicate_artists)
     except Exception as e:
         logging.error(
             f'Exception {e} occurred on execution of query: {sql_queries.clean_up_duplicate_artists}')
-        sys.exit(1)
     try:
-        cur.execute(sql_queries.clean_up_duplicate_songs)
+        with conn.cursor() as cur:
+            cur.execute(sql_queries.clean_up_duplicate_songs)
     except Exception as e:
         logging.error(
             f'Exception {e} occurred on execution of query: {sql_queries.clean_up_duplicate_songs}')
-        sys.exit(1)
     logging.info(
         'Completed cleaning up duplicates in users, time, and songs tables!')
 
@@ -289,15 +307,14 @@ def main():
         port={config.PORT}
     """)
     conn.autocommit = True
-    cur = conn.cursor()
 
     # EXTRACT
     # Staging data extracted from s3 bucket to staging database in redshift
-    load_staging_tables(cur, conn)
+    load_staging_tables(conn)
 
     # TRANSFORM/LOAD
     # Data from staging database loaded into production database (star schema)
-    insert_tables(cur, conn)
+    insert_tables(conn)
 
     conn.close()
     logging.info(f'End of ETL that began at {etl_start_time}')

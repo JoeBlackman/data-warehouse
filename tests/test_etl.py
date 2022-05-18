@@ -50,6 +50,7 @@ def connection_handler():
     conn.close()
 
 
+@pytest.mark.order(1)
 def test_schema(connection_handler):
     """
     tests for schema setup for correctness
@@ -66,6 +67,7 @@ def test_schema(connection_handler):
             assert table[0] in ['songs', 'artists', 'users', 'time', 'songplays']
 
 
+@pytest.mark.order(2)
 def test_load_song(connection_handler):
     """
     tests functionality of etl.load_song
@@ -73,8 +75,7 @@ def test_load_song(connection_handler):
     df = pd.read_csv('tests/staging_songs.csv')
     series = df.iloc[0]
     data = etl.formatForRedshift(series)
-    with connection_handler.cursor() as cur:
-        etl.load_song(cur, data)
+    etl.load_song(connection_handler, data)
 
     with connection_handler as conn:
         songs = pd.read_sql(con=conn, sql='SELECT * FROM songs;')
@@ -87,6 +88,7 @@ def test_load_song(connection_handler):
     assert type(song['duration']) == float64
 
 
+@pytest.mark.order(3)
 def test_load_artist(connection_handler):
     """
     tests functionality of etl.load_artist
@@ -94,8 +96,7 @@ def test_load_artist(connection_handler):
     df = pd.read_csv('tests/staging_songs.csv')
     series = df.iloc[0]
     data = etl.formatForRedshift(series)
-    with connection_handler.cursor() as cur:
-        etl.load_artist(cur, data)
+    etl.load_artist(connection_handler, data)
 
     with connection_handler as conn:
         artists = pd.read_sql(con=conn, sql='SELECT * FROM artists;')
@@ -108,6 +109,7 @@ def test_load_artist(connection_handler):
     assert type(artist['longitude']) == float64
 
 
+@pytest.mark.order(4)
 def test_load_user(connection_handler):
     """
     tests functionality of etl.load_user
@@ -115,8 +117,7 @@ def test_load_user(connection_handler):
     df = pd.read_csv('tests/staging_events.csv')
     series = df.iloc[0]
     data = etl.formatForRedshift(series)
-    with connection_handler.cursor() as cur:
-        etl.load_user(cur, data)
+    etl.load_user(connection_handler, data)
 
     with connection_handler as conn:
         users = pd.read_sql(con=conn, sql='SELECT * FROM users;')
@@ -129,15 +130,15 @@ def test_load_user(connection_handler):
     assert type(user['level']) == str
 
 
+@pytest.mark.order(5)
 def test_load_time(connection_handler):
     """
     tests functionality of load_time
     """
 
     df = pd.read_csv('tests/staging_events.csv')
-    series = df.iloc[0]
-    with connection_handler.cursor() as cur:
-        etl.load_time(cur, series)
+    data = df.iloc[0]
+    etl.load_time(connection_handler, data)
 
     with connection_handler as conn:
         times = pd.read_sql(con=conn, sql='SELECT * FROM time;')
@@ -153,13 +154,20 @@ def test_load_time(connection_handler):
     assert type(time['weekday']) == int64
 
 
-# def test_load_songplay(connection_handler):
-#    cur = connection_handler.cursor()
-    #se_df = pd.read_csv('staging_events.csv')
-    #data = etl.formatForRedshift(df[0])
-    #etl.load_user(cur, se_df[0])
-
-    # songplays =
+#def test_load_songplay(connection_handler):
+#    """
+#    tests functionality of load_songplays
+#    """
+#    
+#    df = pd.read_csv('tests/staging_events.csv')
+#    series = df.iloc[0]
+#    data = etl.formatForRedshift(series)
+#    etl.load_songplay(connection_handler, data)
+#
+#    with connection_handler as conn:
+#        songplays = pd.read_sql(con=conn, sql='SELECT * FROM songplays;')
+#    songplay = songplays.iloc[0]
+#    assert len(songplays) == 1
 
 
 # def test_insert_tables(conn):
