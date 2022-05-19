@@ -5,9 +5,12 @@ staging tables, then analysis tables
 
 import copy
 from datetime import datetime, date
+from unicodedata import decimal
 import boto3
 from debugpy import connect
+from decimal import Decimal
 import logging
+from numpy import int64, float64, NaN
 import pandas as pd
 import pathlib
 import psycopg2
@@ -87,17 +90,17 @@ def insert_tables(conn):
         ]
     )
 
+
+    staging_events_df['registration'] = staging_events_df['registration'].fillna(0).astype(int64)
+    staging_events_df['userId'] = staging_events_df['userId'].fillna(0).astype(int64)
+    staging_events_df['registration'].replace(0, NaN)
+    staging_events_df['userId'].replace(0, NaN)
+
     # load data from staging_events table into analysis tables for users, time, and songplays
     logging.info('Loading users, time, and songplays tables')
     for index, row in staging_events_df.iterrows():
         # only load data if row['page'] == 'NextSong'. other events don't matter.
         if row['page'] == 'NextSong':
-            # prepare contents of row for insertion into tables
-            # userId loaded as float in dataframe, need to make sure its an int
-            if type(row['userId']) == float:
-                row['userId'] = int(row['userId'])
-            if type(row['userId']) == str:
-                row['userId'] = int(float(row['userId']))
             data = formatForRedshift(row)
             load_user(conn, data)
             load_time(conn, data)
@@ -185,7 +188,11 @@ def load_time(conn, data):
     Insert time data into time table
     """
     # transform ts into new fields for time table
-    t = pd.to_datetime(data['ts'], unit='ms')
+    try:
+        t = pd.to_datetime(data['ts'], unit='ms')
+    except Exception as e:
+        logging.error(f'Error on converting timestamp to datetime: {e}')
+        sys.exit(1)
     insert_time_t = Template(sql_queries.time_table_insert)
     insert_time = insert_time_t.substitute(
         start_time=f'\'{t}\'',
@@ -221,7 +228,7 @@ def load_songplay(conn, data):
         artist_id = a[0] if a is not None else 'Null'
         # get the artist_id from the artist table with matching artist name and location
         cur.execute(Template(sql_queries.get_song_id).substitute(
-            title=data['song'], artist_id=artist_id))
+            title=data['song'], artist_id=f'$artist_id${artist_id}$artist_id$'))
         s = cur.fetchone()
         song_id = s[0] if s is not None else 'Null'
     if (time_id == 'Null') or (artist_id == 'Null') or (song_id == 'Null'):
@@ -283,11 +290,11 @@ def formatForRedshift(row):
     for field in data.index:
         if (data[field] is None) or (data[field] in ['NaN', 'Nan', 'nan']):
             data[field] = 'null'
-        elif type(data[field] == str):
-            data[field] = f'${field}${data[field]}${field}$'
-        else:
+        elif type(data[field]) in [int, int64, float, float64, Decimal]:
             # non null bool, int, and float don't need escapes
             continue
+        else:
+            data[field] = f'${field}${data[field]}${field}$'
     return data
 
 
