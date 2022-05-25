@@ -42,3 +42,7 @@ sql_queries.py responsible for housing SQL queries for creation, insertion, sele
   -- was not calling methods of datetime object correctly, also changed weekday to day of week
 - last run of etl ended with my cluster disappearing. why?!
 - taking forever to run code and test it. need more testable code to speed up dev process
+
+Extensions to specific resources in S3 buckets to debug better
+- /2018/11/2018-11-12-events.json
+- /A/A/A
