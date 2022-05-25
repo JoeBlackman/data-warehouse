@@ -1,5 +1,7 @@
+# untracked directories
 /.ipynb_checkpoints
 /.pytest_cache
 /.vscode
 /__pycache__
-/logs
+
+# untracked files
