@@ -23,3 +23,7 @@ IAM_ROLE = config.get('REDSHIFT', 'DWH_IAM_ROLE_NAME')
 ENDPOINT = config.get('REDSHIFT', 'DWH_ENDPOINT')
 
 IAM_ROLE_ARN = config.get('IAM_ROLE', 'ARN')
+
+S3_LOG_DATA = config.get('S3', 'log_data')
+S3_LOG_JSON_PATH = config.get('S3', 'log_json_path')
+S3_SONG_DATA = config.get('S3', 'song_data')
